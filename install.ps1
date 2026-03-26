@@ -144,6 +144,7 @@ pulumi up
 Write-Host ""
 Write-Host "=== Done! ===" -ForegroundColor Green
 Write-Host ""
+$env:PULUMI_CONFIG_PASSPHRASE = ""
 $ip = pulumi stack output serverIp 2>&1
 Write-Host "  Server IP:    $ip" -ForegroundColor Cyan
 Write-Host "  Port:         64738" -ForegroundColor Cyan
