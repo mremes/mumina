@@ -1,7 +1,5 @@
-# Mumina — Setup Script
+# Mumina - Setup Script
 # Run this in PowerShell: .\install.ps1
-
-$ErrorActionPreference = "Stop"
 
 Write-Host ""
 Write-Host "=== Mumina Setup ===" -ForegroundColor Cyan
@@ -19,7 +17,7 @@ $tools = @(
 $needsRestart = $false
 foreach ($tool in $tools) {
     if (Get-Command $tool.Cmd -ErrorAction SilentlyContinue) {
-        Write-Host "  $($tool.Name) — already installed" -ForegroundColor Green
+        Write-Host "  $($tool.Name) - already installed" -ForegroundColor Green
     } else {
         Write-Host "  Installing $($tool.Name)..." -ForegroundColor White
         winget install $tool.Id --accept-source-agreements --accept-package-agreements --silent
@@ -30,7 +28,7 @@ foreach ($tool in $tools) {
 if ($needsRestart) {
     Write-Host ""
     Write-Host "Tools were installed. Please CLOSE this window, open a NEW PowerShell, and run this script again." -ForegroundColor Red
-    Write-Host ""
+    Read-Host "  Press Enter to exit"
     exit 0
 }
 
@@ -40,7 +38,7 @@ Write-Host "[2/6] Google Cloud authentication..." -ForegroundColor Yellow
 Write-Host "  This will open your browser. Sign in with your Google account." -ForegroundColor White
 Write-Host ""
 
-gcloud auth application-default print-access-token 2>&1 | Out-Null
+$null = gcloud auth application-default print-access-token 2>&1
 if ($LASTEXITCODE -ne 0) {
     gcloud auth login
     gcloud auth application-default login
@@ -54,7 +52,7 @@ Write-Host "[3/6] Google Cloud project setup..." -ForegroundColor Yellow
 
 $projectId = Read-Host "  Enter a project ID (e.g. my-mumble-server)"
 
-gcloud projects describe $projectId 2>&1 | Out-Null
+$null = gcloud projects describe $projectId 2>&1
 if ($LASTEXITCODE -eq 0) {
     Write-Host "  Project '$projectId' already exists" -ForegroundColor Green
 } else {
@@ -66,10 +64,11 @@ if ($LASTEXITCODE -eq 0) {
 Write-Host ""
 Write-Host "  Linking billing account..." -ForegroundColor White
 $billingAccounts = gcloud billing accounts list --format="value(ACCOUNT_ID)" 2>&1
-$billingLines = $billingAccounts -split "`n" | Where-Object { $_.Trim() -ne "" }
+$billingLines = ($billingAccounts -split "`n") | Where-Object { $_.Trim() -ne "" }
 
 if ($billingLines.Count -eq 0) {
     Write-Host "  No billing account found. Go to https://console.cloud.google.com/billing to set one up." -ForegroundColor Red
+    Read-Host "  Press Enter to exit"
     exit 1
 } elseif ($billingLines.Count -eq 1) {
     $billingId = $billingLines[0].Trim()
@@ -94,7 +93,7 @@ Write-Host "[4/6] Pulumi setup..." -ForegroundColor Yellow
 
 $env:PULUMI_CONFIG_PASSPHRASE = ""
 
-pulumi whoami 2>&1 | Out-Null
+$null = pulumi whoami 2>&1
 if ($LASTEXITCODE -ne 0) {
     pulumi login --local
 }
@@ -152,9 +151,10 @@ Write-Host "  Server name:  $serverName" -ForegroundColor Cyan
 Write-Host ""
 Write-Host "  Connect with Mumble client:" -ForegroundColor White
 Write-Host "    1. Download from https://www.mumble.info/downloads/" -ForegroundColor White
-Write-Host "    2. Server > Connect > Add New" -ForegroundColor White
+Write-Host "    2. Server -> Connect -> Add New" -ForegroundColor White
 Write-Host "    3. Address: $ip  Port: 64738" -ForegroundColor White
 Write-Host "    4. Enter server password when prompted" -ForegroundColor White
 Write-Host ""
 Write-Host "  Admin: connect with username 'SuperUser'" -ForegroundColor White
 Write-Host ""
+Read-Host "  Press Enter to exit"
