@@ -13,6 +13,16 @@ Write-Host ""
 
 pulumi destroy
 
+if ($LASTEXITCODE -ne 0) {
+    Write-Host ""
+    Write-Host "Destroy was cancelled or failed." -ForegroundColor Yellow
+    Write-Host ""
+    Read-Host "Press Enter to close"
+    exit 0
+}
+
+pulumi stack rm dev --yes 2>&1 | Out-Null
+
 Write-Host ""
 Write-Host "Infrastructure destroyed." -ForegroundColor Green
 Write-Host ""
