@@ -1,6 +1,8 @@
 # Mumina - Setup Script
 # Run this in PowerShell: .\install.ps1
 
+$env:PULUMI_CONFIG_PASSPHRASE = ""
+
 Write-Host ""
 Write-Host "=== Mumina Setup ===" -ForegroundColor Cyan
 Write-Host ""
@@ -90,8 +92,6 @@ gcloud services enable compute.googleapis.com --project=$projectId
 # --- Step 4: Pulumi stack ---
 Write-Host ""
 Write-Host "[4/6] Pulumi setup..." -ForegroundColor Yellow
-
-$env:PULUMI_CONFIG_PASSPHRASE = ""
 
 $null = pulumi whoami 2>&1
 if ($LASTEXITCODE -ne 0) {
