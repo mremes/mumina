@@ -64,22 +64,22 @@ if ($LASTEXITCODE -eq 0) {
 Write-Host ""
 Write-Host "  Linking billing account..." -ForegroundColor White
 $billingAccounts = gcloud billing accounts list --format="value(ACCOUNT_ID)" 2>&1
-$billingLines = ($billingAccounts -split "`n") | Where-Object { $_.Trim() -ne "" }
+$billingLines = @(($billingAccounts -split "`n") | Where-Object { $_.Trim() -ne "" })
 
 if ($billingLines.Count -eq 0) {
     Write-Host "  No billing account found. Go to https://console.cloud.google.com/billing to set one up." -ForegroundColor Red
     Read-Host "  Press Enter to exit"
     exit 1
 } elseif ($billingLines.Count -eq 1) {
-    $billingId = $billingLines[0].Trim()
+    $billingId = $billingLines[0].ToString().Trim()
     Write-Host "  Using billing account: $billingId" -ForegroundColor Green
 } else {
     Write-Host "  Available billing accounts:" -ForegroundColor White
     for ($i = 0; $i -lt $billingLines.Count; $i++) {
-        Write-Host "    [$i] $($billingLines[$i].Trim())" -ForegroundColor White
+        Write-Host "    [$i] $($billingLines[$i].ToString().Trim())" -ForegroundColor White
     }
     $choice = Read-Host "  Pick one (number)"
-    $billingId = $billingLines[$choice].Trim()
+    $billingId = $billingLines[$choice].ToString().Trim()
 }
 
 gcloud billing projects link $projectId --billing-account=$billingId
