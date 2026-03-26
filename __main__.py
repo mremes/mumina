@@ -12,6 +12,7 @@ zone = config.get("zone") or "europe-north1-a"
 region = zone.rsplit("-", 1)[0]
 max_users = config.get_int("maxUsers") or 10
 mumble_port = config.get_int("port") or 64738
+channels = config.get("channels") or ""
 
 # --- Static External IP ---
 static_ip = gcp.compute.Address(
@@ -72,7 +73,7 @@ host=
 serverpassword=PLACEHOLDER_SERVER_PASSWORD
 
 # Limits
-bandwidth=558000
+bandwidth=130000
 users={max_users}
 
 # Codec
@@ -109,6 +110,25 @@ su -s /bin/bash mumble-server -c "murmurd -ini /etc/mumble-server.ini -supw '{ar
 
 systemctl enable mumble-server
 systemctl start mumble-server
+
+# Create channels
+apt-get install -y -qq sqlite3
+IFS=',' read -ra CHANNELS <<< "{channels}"
+NEXT_ID=$(sqlite3 /var/lib/mumble-server/mumble-server.sqlite "SELECT COALESCE(MAX(channel_id),0)+1 FROM channels WHERE server_id=1;")
+for ch in "${{CHANNELS[@]}}"; do
+    ch=$(echo "$ch" | xargs)
+    if [ -n "$ch" ]; then
+        sqlite3 /var/lib/mumble-server/mumble-server.sqlite \
+            "INSERT INTO channels (server_id, channel_id, parent_id, name) VALUES (1, $NEXT_ID, 0, '$ch');"
+        echo "Created channel: $ch"
+        NEXT_ID=$((NEXT_ID + 1))
+    fi
+done
+
+# Restart to pick up new channels
+killall murmurd 2>/dev/null || true
+sleep 2
+/usr/sbin/murmurd -ini /etc/mumble-server.ini
 
 touch "$MARKER"
 echo "Mumble server setup complete."

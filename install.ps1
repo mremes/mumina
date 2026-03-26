@@ -130,6 +130,11 @@ $maxUsers = Read-Host "  Max users (press Enter for 10)"
 if ([string]::IsNullOrWhiteSpace($maxUsers)) { $maxUsers = "10" }
 pulumi config set mumina:maxUsers $maxUsers
 
+$channels = Read-Host "  Channels to create (comma-separated, or press Enter for none)"
+if (-not [string]::IsNullOrWhiteSpace($channels)) {
+    pulumi config set mumina:channels $channels
+}
+
 $serverPassword = Read-Host "  Server password (users need this to connect)"
 pulumi config set --secret mumina:serverPassword $serverPassword
 
