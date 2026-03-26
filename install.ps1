@@ -157,10 +157,35 @@ if ($LASTEXITCODE -ne 0) {
     exit 0
 }
 
+# --- Verify server is reachable ---
+Write-Host ""
+Write-Host "Waiting for server to come online..." -ForegroundColor Yellow
+$ip = pulumi stack output serverIp 2>&1
+
+$ready = $false
+$wait = 3
+for ($attempt = 1; $attempt -le 8; $attempt++) {
+    $result = Test-NetConnection -ComputerName $ip -Port 64738 -WarningAction SilentlyContinue
+    if ($result.TcpTestSucceeded) {
+        $ready = $true
+        break
+    }
+    Write-Host "  Not ready yet, retrying in ${wait}s..." -ForegroundColor White
+    Start-Sleep -Seconds $wait
+    $wait = [math]::Min($wait * 2, 60)
+}
+
+if (-not $ready) {
+    Write-Host ""
+    Write-Host "Server deployed but not responding on port 64738 yet." -ForegroundColor Yellow
+    Write-Host "It may need a few more minutes. Try connecting with Mumble shortly." -ForegroundColor White
+} else {
+    Write-Host "  Server is online!" -ForegroundColor Green
+}
+
 Write-Host ""
 Write-Host "=== Done! ===" -ForegroundColor Green
 Write-Host ""
-$ip = pulumi stack output serverIp 2>&1
 Write-Host "  Server IP:    $ip" -ForegroundColor Cyan
 Write-Host "  Port:         64738" -ForegroundColor Cyan
 Write-Host "  Server name:  $serverName" -ForegroundColor Cyan

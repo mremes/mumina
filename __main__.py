@@ -108,11 +108,15 @@ sed -i "s|PLACEHOLDER_SERVER_PASSWORD|{args[0]}|g" /etc/mumble-server.ini
 # Set SuperUser password (hashed into the SQLite DB)
 su -s /bin/bash mumble-server -c "murmurd -ini /etc/mumble-server.ini -supw '{args[1]}'"
 
-systemctl enable mumble-server
-systemctl start mumble-server
-
-# Create channels
+# Create channels before starting the service
 apt-get install -y -qq sqlite3
+# Start briefly to initialize the DB, then stop
+systemctl start mumble-server
+sleep 2
+systemctl stop mumble-server
+killall murmurd 2>/dev/null || true
+sleep 1
+
 IFS=',' read -ra CHANNELS <<< "{channels}"
 NEXT_ID=$(sqlite3 /var/lib/mumble-server/mumble-server.sqlite "SELECT COALESCE(MAX(channel_id),0)+1 FROM channels WHERE server_id=1;")
 for ch in "${{CHANNELS[@]}}"; do
@@ -125,10 +129,19 @@ for ch in "${{CHANNELS[@]}}"; do
     fi
 done
 
-# Restart to pick up new channels
+# Start the service for real
+systemctl enable mumble-server
 killall murmurd 2>/dev/null || true
-sleep 2
+sleep 1
 /usr/sbin/murmurd -ini /etc/mumble-server.ini
+
+# Verify it's running
+sleep 2
+if pgrep -x murmurd > /dev/null; then
+    echo "Mumble server is running."
+else
+    echo "WARNING: Mumble server failed to start!"
+fi
 
 touch "$MARKER"
 echo "Mumble server setup complete."
