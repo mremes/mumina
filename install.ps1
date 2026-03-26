@@ -143,6 +143,15 @@ Write-Host ""
 
 pulumi up
 
+if ($LASTEXITCODE -ne 0) {
+    Write-Host ""
+    Write-Host "Deploy was cancelled or failed." -ForegroundColor Yellow
+    Write-Host "You can re-run the deploy later with: pulumi up" -ForegroundColor White
+    Write-Host ""
+    Read-Host "Press Enter to close"
+    exit 0
+}
+
 Write-Host ""
 Write-Host "=== Done! ===" -ForegroundColor Green
 Write-Host ""
