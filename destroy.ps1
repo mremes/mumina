@@ -1,7 +1,7 @@
 # Mumina - Destroy Script
 # Run this in PowerShell: .\destroy.ps1
 
-$env:PULUMI_CONFIG_PASSPHRASE = ""
+[Environment]::SetEnvironmentVariable("PULUMI_CONFIG_PASSPHRASE", "", "Process")
 
 Write-Host ""
 Write-Host "=== Mumina Destroy ===" -ForegroundColor Red
