@@ -11,13 +11,7 @@ Write-Host ""
 Write-Host "This will delete the Mumble server and all associated GCP resources." -ForegroundColor Yellow
 Write-Host ""
 
-$confirm = Read-Host "Are you sure? (yes/no)"
-if ($confirm -ne "yes") {
-    Write-Host "Cancelled." -ForegroundColor Green
-    exit 0
-}
-
-pulumi destroy --yes
+pulumi destroy
 
 Write-Host ""
 Write-Host "Infrastructure destroyed." -ForegroundColor Green
