@@ -1,6 +1,7 @@
-# Mumina — Mumble Voice Server on GCP
+# Mumina — Mumble Voice Server
 
-One-command [Mumble](https://www.mumble.info/) voice chat server on Google Cloud.
+One-command [Mumble](https://www.mumble.info/) voice chat server on the cloud.
+Choose between **UpCloud** (Helsinki) or **Google Cloud** (Hamina, Finland).
 Automated with [Pulumi](https://www.pulumi.com/) — run the setup script and you're online.
 
 ## Quick Start
@@ -14,21 +15,32 @@ cd mumina
 ```
 
 The script walks you through everything:
-1. Installs Google Cloud CLI, Pulumi, and Python (if missing)
-2. Logs you into Google Cloud (opens your browser)
-3. Creates a GCP project and links billing
-4. Asks you to pick a server name, password, location, etc.
-5. Deploys the server
+1. Asks which cloud provider (UpCloud or GCP)
+2. Installs Pulumi and Python (+ Google Cloud CLI if using GCP)
+3. Authenticates with your chosen provider
+4. Asks you to pick a server name, password, channels, etc.
+5. Deploys the server and verifies connectivity
 
 At the end it prints the IP address. Connect with the [Mumble client](https://www.mumble.info/downloads/).
+
+## Cloud Providers
+
+| | UpCloud | Google Cloud |
+|---|---|---|
+| **Location** | Helsinki | Hamina (~150km from Helsinki) |
+| **Latency** | ~17ms | ~45ms |
+| **Cost** | ~5 EUR/mo | ~7-8 USD/mo |
+| **Auth** | API token | Google account + billing |
+| **Plan** | 1xCPU-1GB | e2-micro |
 
 ## Prerequisites
 
 - **Windows** with PowerShell
-- **Google account** with a credit card added for billing
-  (Google gives **$300 free credits** for new accounts, after that ~$7-8/month)
+- **UpCloud account** with an API token ([hub.upcloud.com/people](https://hub.upcloud.com/people))
+  — or —
+- **Google Cloud account** with a credit card for billing
 
-That's it — the install script handles the rest.
+The install script handles everything else.
 
 ## Connecting
 
@@ -42,58 +54,60 @@ That's it — the install script handles the rest.
 
 Connect with username **SuperUser** and use the admin password you set during setup.
 
+### Best latency settings (client-side)
+
+- **Configure > Settings > Audio Input** — set "Audio per packet" to **10ms**
+- **Configure > Settings > Audio Output** — reduce "Output delay" to minimum
+
 ---
 
 ## Configuration
 
 All settings are stored in `Pulumi.dev.yaml` (local, not committed to git).
-Change them anytime with `pulumi config set`:
-
-```powershell
-$env:PULUMI_CONFIG_PASSPHRASE = ""
-pulumi config set mumina:serverName "New Name"
-pulumi up
-```
 
 | Key | Required | Default | Description |
 |-----|----------|---------|-------------|
-| `gcp:project` | yes | — | Your GCP project ID |
+| `mumina:provider` | yes | `gcp` | Cloud provider (`upcloud` or `gcp`) |
 | `mumina:serverPassword` | yes | — | Password users need to connect |
 | `mumina:superUserPassword` | yes | — | Admin password for SuperUser |
 | `mumina:serverName` | yes | — | Display name in Mumble |
-| `mumina:zone` | no | `europe-north1-a` | GCP zone ([full list](https://cloud.google.com/compute/docs/regions-zones)) |
-| `mumina:machineType` | no | `e2-micro` | VM size ([options](https://cloud.google.com/compute/docs/general-purpose-machines)) |
+| `mumina:channels` | no | — | Comma-separated channels to create |
+| `mumina:zone` | no | `fi-hel1` / `europe-north1-a` | Server zone |
+| `mumina:machineType` | no | `1xCPU-1GB` / `e2-micro` | VM plan |
 | `mumina:maxUsers` | no | `10` | Max concurrent users |
 | `mumina:port` | no | `64738` | Mumble server port |
-| `mumina:welcomeText` | no | auto | HTML welcome message |
+| `mumina:welcomeText` | no | auto | Welcome message (HTML) |
 
-## Day-to-Day Commands
+Provider-specific:
+
+| Key | Provider | Description |
+|-----|----------|-------------|
+| `upcloud:token` | UpCloud | API token (secret) |
+| `gcp:project` | GCP | Project ID |
+
+## Destroy
 
 ```powershell
-# Always set this first in a new PowerShell window
-$env:PULUMI_CONFIG_PASSPHRASE = ""
-
-# Deploy or update
-pulumi up
-
-# Show server IP
-pulumi stack output serverIp
-
-# Shut down and delete everything
-pulumi destroy
-
-# SSH into the server
-gcloud compute ssh mumble-server --zone=europe-north1-a --project=YOUR_PROJECT
+.\destroy.ps1
 ```
+
+Removes all cloud resources, Pulumi stack, and local config files.
 
 ## Troubleshooting
 
-### "passphrase must be set" error
-
-Run this before any `pulumi` command:
+### "stack is currently locked"
 
 ```powershell
-$env:PULUMI_CONFIG_PASSPHRASE = ""
+pulumi cancel
+```
+
+### "passphrase must be set"
+
+The scripts handle this automatically. If running pulumi manually, create a `.passphrase` file first:
+
+```powershell
+"" | Set-Content -NoNewline .passphrase
+$env:PULUMI_CONFIG_PASSPHRASE_FILE = ".passphrase"
 ```
 
 ### "not recognized" after installing tools
@@ -113,11 +127,3 @@ sudo /usr/sbin/murmurd -ini /etc/mumble-server.ini
 ### Mumble client shows old server name
 
 Close Mumble completely (check system tray), reopen and reconnect.
-
-## What This Creates
-
-| Resource | Purpose | Cost |
-|----------|---------|------|
-| Static IP | Permanent address | Free (while attached) |
-| Firewall rules | Open port 64738 + SSH | Free |
-| VM (e2-micro) | Debian 12 + Mumble server | ~$7-8/month |
