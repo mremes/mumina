@@ -19,6 +19,7 @@ static_ip = gcp.compute.Address(
     "mumble-ip",
     region=region,
     address_type="EXTERNAL",
+    network_tier="PREMIUM",
 )
 
 # --- Firewall: Mumble (TCP+UDP) ---
