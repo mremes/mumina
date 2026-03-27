@@ -127,8 +127,8 @@ $zone = Read-Host "  GCP zone (press Enter for europe-north1-a / Finland)"
 if ([string]::IsNullOrWhiteSpace($zone)) { $zone = "europe-north1-a" }
 pulumi config set mumina:zone $zone
 
-$machineType = Read-Host "  Machine type (press Enter for e2-micro)"
-if ([string]::IsNullOrWhiteSpace($machineType)) { $machineType = "e2-micro" }
+$machineType = Read-Host "  Machine type (press Enter for e2-small)"
+if ([string]::IsNullOrWhiteSpace($machineType)) { $machineType = "e2-small" }
 pulumi config set mumina:machineType $machineType
 
 $maxUsers = Read-Host "  Max users (press Enter for 10)"
