@@ -9,14 +9,30 @@ Write-Host ""
 Write-Host "=== Mumina Setup ===" -ForegroundColor Cyan
 Write-Host ""
 
-# --- Step 1: Install tools ---
-Write-Host "[1/6] Installing required tools..." -ForegroundColor Yellow
+# --- Step 1: Choose provider ---
+Write-Host "[1/6] Choose cloud provider..." -ForegroundColor Yellow
+Write-Host "  [1] UpCloud (Helsinki, lowest latency, ~5 EUR/mo)" -ForegroundColor White
+Write-Host "  [2] Google Cloud (Hamina/Finland, ~7-8 USD/mo)" -ForegroundColor White
+$providerChoice = Read-Host "  Pick one (1 or 2, press Enter for 1)"
+if ($providerChoice -eq "2") {
+    $provider = "gcp"
+} else {
+    $provider = "upcloud"
+}
 
+# --- Step 2: Install tools and authenticate ---
+Write-Host ""
+Write-Host "[2/6] Installing tools and authenticating..." -ForegroundColor Yellow
+
+# Always need Pulumi and Python
 $tools = @(
-    @{ Name = "Google Cloud CLI"; Id = "Google.CloudSDK"; Cmd = "gcloud" },
     @{ Name = "Pulumi CLI"; Id = "Pulumi.Pulumi"; Cmd = "pulumi" },
     @{ Name = "Python"; Id = "Python.Python.3.12"; Cmd = "python" }
 )
+
+if ($provider -eq "gcp") {
+    $tools += @{ Name = "Google Cloud CLI"; Id = "Google.CloudSDK"; Cmd = "gcloud" }
+}
 
 $needsRestart = $false
 foreach ($tool in $tools) {
@@ -36,65 +52,69 @@ if ($needsRestart) {
     exit 0
 }
 
-# --- Step 2: Google Cloud auth ---
+# --- Step 3: Provider-specific setup ---
 Write-Host ""
-Write-Host "[2/6] Google Cloud authentication..." -ForegroundColor Yellow
-Write-Host "  This will open your browser. Sign in with your Google account." -ForegroundColor White
-Write-Host ""
+Write-Host "[3/6] Cloud provider setup..." -ForegroundColor Yellow
 
-$null = gcloud auth application-default print-access-token 2>&1
-if ($LASTEXITCODE -ne 0) {
-    gcloud auth login
-    gcloud auth application-default login
-} else {
-    Write-Host "  Already authenticated" -ForegroundColor Green
-}
-
-# --- Step 3: GCP project ---
-Write-Host ""
-Write-Host "[3/6] Google Cloud project setup..." -ForegroundColor Yellow
-
-do {
-    $projectId = Read-Host "  Enter a project ID (6-30 chars, lowercase letters/digits/hyphens)"
-    if ($projectId -notmatch "^[a-z][a-z0-9\-]{5,29}$") {
-        Write-Host "  Invalid ID. Must be 6-30 chars, start with a letter, only lowercase/digits/hyphens." -ForegroundColor Red
+if ($provider -eq "gcp") {
+    Write-Host "  Authenticating with Google Cloud..." -ForegroundColor White
+    $null = gcloud auth application-default print-access-token 2>&1
+    if ($LASTEXITCODE -ne 0) {
+        gcloud auth login
+        gcloud auth application-default login
+    } else {
+        Write-Host "  Already authenticated" -ForegroundColor Green
     }
-} while ($projectId -notmatch "^[a-z][a-z0-9\-]{5,29}$")
 
-$null = gcloud projects describe $projectId 2>&1
-if ($LASTEXITCODE -eq 0) {
-    Write-Host "  Project '$projectId' already exists" -ForegroundColor Green
-} else {
-    Write-Host "  Creating project '$projectId'..." -ForegroundColor White
-    gcloud projects create $projectId --name="Mumble Server" --labels=environment=development
-}
+    Write-Host ""
+    do {
+        $projectId = Read-Host "  Enter a GCP project ID (6-30 chars, lowercase letters/digits/hyphens)"
+        if ($projectId -notmatch "^[a-z][a-z0-9\-]{5,29}$") {
+            Write-Host "  Invalid ID. Must be 6-30 chars, start with a letter, only lowercase/digits/hyphens." -ForegroundColor Red
+        }
+    } while ($projectId -notmatch "^[a-z][a-z0-9\-]{5,29}$")
 
-# Link billing
-Write-Host ""
-Write-Host "  Linking billing account..." -ForegroundColor White
-$billingAccounts = gcloud billing accounts list --format="value(ACCOUNT_ID)" 2>&1
-$billingLines = @(($billingAccounts -split "`n") | Where-Object { $_.Trim() -ne "" })
-
-if ($billingLines.Count -eq 0) {
-    Write-Host "  No billing account found. Go to https://console.cloud.google.com/billing to set one up." -ForegroundColor Red
-    Read-Host "  Press Enter to exit"
-    exit 1
-} elseif ($billingLines.Count -eq 1) {
-    $billingId = $billingLines[0].ToString().Trim()
-    Write-Host "  Using billing account: $billingId" -ForegroundColor Green
-} else {
-    Write-Host "  Available billing accounts:" -ForegroundColor White
-    for ($i = 0; $i -lt $billingLines.Count; $i++) {
-        Write-Host "    [$i] $($billingLines[$i].ToString().Trim())" -ForegroundColor White
+    $null = gcloud projects describe $projectId 2>&1
+    if ($LASTEXITCODE -eq 0) {
+        Write-Host "  Project '$projectId' already exists" -ForegroundColor Green
+    } else {
+        Write-Host "  Creating project '$projectId'..." -ForegroundColor White
+        gcloud projects create $projectId --name="Mumble Server" --labels=environment=development
     }
-    $choice = Read-Host "  Pick one (number)"
-    $billingId = $billingLines[$choice].ToString().Trim()
+
+    Write-Host ""
+    Write-Host "  Linking billing account..." -ForegroundColor White
+    $billingAccounts = gcloud billing accounts list --format="value(ACCOUNT_ID)" 2>&1
+    $billingLines = @(($billingAccounts -split "`n") | Where-Object { $_.Trim() -ne "" })
+
+    if ($billingLines.Count -eq 0) {
+        Write-Host "  No billing account found. Go to https://console.cloud.google.com/billing to set one up." -ForegroundColor Red
+        Read-Host "  Press Enter to exit"
+        exit 1
+    } elseif ($billingLines.Count -eq 1) {
+        $billingId = $billingLines[0].ToString().Trim()
+        Write-Host "  Using billing account: $billingId" -ForegroundColor Green
+    } else {
+        Write-Host "  Available billing accounts:" -ForegroundColor White
+        for ($i = 0; $i -lt $billingLines.Count; $i++) {
+            Write-Host "    [$i] $($billingLines[$i].ToString().Trim())" -ForegroundColor White
+        }
+        $choice = Read-Host "  Pick one (number)"
+        $billingId = $billingLines[$choice].ToString().Trim()
+    }
+
+    gcloud billing projects link $projectId --billing-account=$billingId
+
+    Write-Host "  Enabling Compute Engine API..." -ForegroundColor White
+    gcloud services enable compute.googleapis.com --project=$projectId
+
+} elseif ($provider -eq "upcloud") {
+    Write-Host "  UpCloud uses API credentials." -ForegroundColor White
+    Write-Host "  Create an API user at: https://hub.upcloud.com/people" -ForegroundColor White
+    Write-Host ""
+    $ucUser = Read-Host "  UpCloud API username"
+    $ucPassword = Read-Host "  UpCloud API password"
 }
-
-gcloud billing projects link $projectId --billing-account=$billingId
-
-Write-Host "  Enabling Compute Engine API..." -ForegroundColor White
-gcloud services enable compute.googleapis.com --project=$projectId
 
 # --- Step 4: Pulumi stack ---
 Write-Host ""
@@ -118,18 +138,34 @@ Write-Host ""
 Write-Host "[5/6] Server configuration..." -ForegroundColor Yellow
 Write-Host ""
 
-pulumi config set gcp:project $projectId
+pulumi config set mumina:provider $provider
+
+if ($provider -eq "gcp") {
+    pulumi config set gcp:project $projectId
+
+    $zone = Read-Host "  GCP zone (press Enter for europe-north1-a / Finland)"
+    if ([string]::IsNullOrWhiteSpace($zone)) { $zone = "europe-north1-a" }
+    pulumi config set mumina:zone $zone
+
+    $machineType = Read-Host "  Machine type (press Enter for e2-micro)"
+    if ([string]::IsNullOrWhiteSpace($machineType)) { $machineType = "e2-micro" }
+    pulumi config set mumina:machineType $machineType
+
+} elseif ($provider -eq "upcloud") {
+    pulumi config set upcloud:username $ucUser
+    pulumi config set --secret upcloud:password $ucPassword
+
+    $zone = Read-Host "  UpCloud zone (press Enter for fi-hel1 / Helsinki)"
+    if ([string]::IsNullOrWhiteSpace($zone)) { $zone = "fi-hel1" }
+    pulumi config set mumina:zone $zone
+
+    $plan = Read-Host "  Server plan (press Enter for 1xCPU-1GB)"
+    if ([string]::IsNullOrWhiteSpace($plan)) { $plan = "1xCPU-1GB" }
+    pulumi config set mumina:machineType $plan
+}
 
 $serverName = Read-Host "  Server name (displayed in Mumble)"
 pulumi config set mumina:serverName $serverName
-
-$zone = Read-Host "  GCP zone (press Enter for europe-north1-a / Finland)"
-if ([string]::IsNullOrWhiteSpace($zone)) { $zone = "europe-north1-a" }
-pulumi config set mumina:zone $zone
-
-$machineType = Read-Host "  Machine type (press Enter for e2-micro)"
-if ([string]::IsNullOrWhiteSpace($machineType)) { $machineType = "e2-micro" }
-pulumi config set mumina:machineType $machineType
 
 $maxUsers = Read-Host "  Max users (press Enter for 10)"
 if ([string]::IsNullOrWhiteSpace($maxUsers)) { $maxUsers = "10" }
