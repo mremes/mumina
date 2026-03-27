@@ -130,6 +130,7 @@ if provider == "upcloud":
         zone=zone,
         plan=plan,
         firewall=True,
+        metadata=True,
         template=upcloud.ServerTemplateArgs(
             storage="Debian GNU/Linux 12 (Bookworm)",
             size=10,
@@ -144,44 +145,9 @@ if provider == "upcloud":
         user_data=startup_script,
     )
 
-    firewall_rules = upcloud.ServerFirewallRules(
-        "mumble-firewall",
-        server_id=server.id,
-        firewall_rules=[
-            upcloud.ServerFirewallRulesFirewallRuleArgs(
-                action="accept",
-                direction="in",
-                family="IPv4",
-                protocol="tcp",
-                destination_port_start=str(mumble_port),
-                destination_port_end=str(mumble_port),
-            ),
-            upcloud.ServerFirewallRulesFirewallRuleArgs(
-                action="accept",
-                direction="in",
-                family="IPv4",
-                protocol="udp",
-                destination_port_start=str(mumble_port),
-                destination_port_end=str(mumble_port),
-            ),
-            upcloud.ServerFirewallRulesFirewallRuleArgs(
-                action="accept",
-                direction="in",
-                family="IPv4",
-                protocol="tcp",
-                destination_port_start="22",
-                destination_port_end="22",
-            ),
-            upcloud.ServerFirewallRulesFirewallRuleArgs(
-                action="drop",
-                direction="in",
-            ),
-        ],
-    )
-
     server_ip = server.network_interfaces.apply(
         lambda ifaces: next(
-            (i.ip_addresses[0].address for i in ifaces if i.type == "public"), None
+            (i.ip_address for i in ifaces if i.type == "public"), None
         )
     )
 
