@@ -109,11 +109,9 @@ if ($provider -eq "gcp") {
     gcloud services enable compute.googleapis.com --project=$projectId
 
 } elseif ($provider -eq "upcloud") {
-    Write-Host "  UpCloud uses API credentials." -ForegroundColor White
-    Write-Host "  Create an API user at: https://hub.upcloud.com/people" -ForegroundColor White
+    Write-Host "  Get your API token at: https://hub.upcloud.com/people" -ForegroundColor White
     Write-Host ""
-    $ucUser = Read-Host "  UpCloud API username"
-    $ucPassword = Read-Host "  UpCloud API password"
+    $ucToken = Read-Host "  UpCloud API token"
 }
 
 # --- Step 4: Pulumi stack ---
@@ -152,8 +150,7 @@ if ($provider -eq "gcp") {
     pulumi config set mumina:machineType $machineType
 
 } elseif ($provider -eq "upcloud") {
-    pulumi config set upcloud:username $ucUser
-    pulumi config set --secret upcloud:password $ucPassword
+    pulumi config set --secret upcloud:token $ucToken
 
     $zone = Read-Host "  UpCloud zone (press Enter for fi-hel1 / Helsinki)"
     if ([string]::IsNullOrWhiteSpace($zone)) { $zone = "fi-hel1" }
