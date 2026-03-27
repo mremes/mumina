@@ -54,7 +54,12 @@ if ($LASTEXITCODE -ne 0) {
 Write-Host ""
 Write-Host "[3/6] Google Cloud project setup..." -ForegroundColor Yellow
 
-$projectId = Read-Host "  Enter a project ID (e.g. my-mumble-server)"
+do {
+    $projectId = Read-Host "  Enter a project ID (6-30 chars, lowercase letters/digits/hyphens)"
+    if ($projectId -notmatch "^[a-z][a-z0-9\-]{5,29}$") {
+        Write-Host "  Invalid ID. Must be 6-30 chars, start with a letter, only lowercase/digits/hyphens." -ForegroundColor Red
+    }
+} while ($projectId -notmatch "^[a-z][a-z0-9\-]{5,29}$")
 
 $null = gcloud projects describe $projectId 2>&1
 if ($LASTEXITCODE -eq 0) {
