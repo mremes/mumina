@@ -6,12 +6,12 @@ provider = config.get("provider") or "gcp"
 server_password = config.require_secret("serverPassword")
 super_user_password = config.require_secret("superUserPassword")
 server_name = config.require("serverName")
-welcome_text = config.get("welcomeText") or f"<br/>Welcome to <b>{server_name}</b> voice server.<br/>Enjoy your stay!<br/><br/><b>For best latency:</b> Configure &gt; Settings &gt; Audio Input &gt; set Audio per packet to 10ms. Audio Output &gt; reduce Output delay to minimum.<br/>"
+welcome_text = config.get("welcomeText") or f"Welcome to <b>{server_name}</b>. For low latency: Settings, Audio Input, set Audio per packet to 10ms."
 max_users = config.get_int("maxUsers") or 10
 mumble_port = config.get_int("port") or 64738
 channels = config.get("channels") or ""
 
-# --- Startup Script (shared) ---
+# --- Startup Script ---
 startup_script = pulumi.Output.all(
     server_password, super_user_password
 ).apply(
@@ -75,28 +75,24 @@ sed -i "s|PLACEHOLDER_SERVER_PASSWORD|{args[0]}|g" /etc/mumble-server.ini
 # Set SuperUser password (hashed into the SQLite DB)
 su -s /bin/bash mumble-server -c "murmurd -ini /etc/mumble-server.ini -supw '{args[1]}'"
 
-# Create channels before starting the service
-apt-get install -y -qq sqlite3
-# Start briefly to initialize the DB, then stop
-systemctl start mumble-server
-sleep 2
-systemctl stop mumble-server
-killall murmurd 2>/dev/null || true
-sleep 1
+# Create channels if any were specified
+CHANNEL_LIST="{channels}"
+if [ -n "$CHANNEL_LIST" ]; then
+    apt-get install -y -qq sqlite3
+    NEXT_ID=$(sqlite3 /var/lib/mumble-server/mumble-server.sqlite "SELECT COALESCE(MAX(channel_id),0)+1 FROM channels WHERE server_id=1;")
+    IFS=',' read -ra CHANNELS <<< "$CHANNEL_LIST"
+    for ch in "${{CHANNELS[@]}}"; do
+        ch=$(echo "$ch" | xargs)
+        if [ -n "$ch" ]; then
+            sqlite3 /var/lib/mumble-server/mumble-server.sqlite \
+                "INSERT INTO channels (server_id, channel_id, parent_id, name) VALUES (1, $NEXT_ID, 0, '$ch');"
+            echo "Created channel: $ch"
+            NEXT_ID=$((NEXT_ID + 1))
+        fi
+    done
+fi
 
-IFS=',' read -ra CHANNELS <<< "{channels}"
-NEXT_ID=$(sqlite3 /var/lib/mumble-server/mumble-server.sqlite "SELECT COALESCE(MAX(channel_id),0)+1 FROM channels WHERE server_id=1;")
-for ch in "${{CHANNELS[@]}}"; do
-    ch=$(echo "$ch" | xargs)
-    if [ -n "$ch" ]; then
-        sqlite3 /var/lib/mumble-server/mumble-server.sqlite \
-            "INSERT INTO channels (server_id, channel_id, parent_id, name) VALUES (1, $NEXT_ID, 0, '$ch');"
-        echo "Created channel: $ch"
-        NEXT_ID=$((NEXT_ID + 1))
-    fi
-done
-
-# Start the service for real
+# Start the service
 systemctl enable mumble-server
 killall murmurd 2>/dev/null || true
 sleep 1
@@ -115,106 +111,15 @@ echo "Mumble server setup complete."
 """
 )
 
-# --- Provider-specific infrastructure ---
-server_ip = None
-
+# --- Deploy to selected provider ---
 if provider == "upcloud":
-    import pulumi_upcloud as upcloud
-
-    zone = config.get("zone") or "fi-hel1"
-    plan = config.get("machineType") or "1xCPU-1GB"
-
-    server = upcloud.Server(
-        "mumble-server",
-        hostname="mumble",
-        zone=zone,
-        plan=plan,
-        firewall=True,
-        metadata=True,
-        template=upcloud.ServerTemplateArgs(
-            storage="Debian GNU/Linux 12 (Bookworm)",
-            size=10,
-        ),
-        network_interfaces=[
-            upcloud.ServerNetworkInterfaceArgs(type="public"),
-        ],
-        login=upcloud.ServerLoginArgs(
-            create_password=False,
-            password_delivery="none",
-        ),
-        user_data=startup_script,
-    )
-
-    server_ip = server.network_interfaces.apply(
-        lambda ifaces: next(
-            (i.ip_address for i in ifaces if i.type == "public"), None
-        )
-    )
-
+    from providers.upcloud import deploy
 elif provider == "gcp":
-    import pulumi_gcp as gcp
-
-    zone = config.get("zone") or "europe-north1-a"
-    region = zone.rsplit("-", 1)[0]
-    machine_type = config.get("machineType") or "e2-micro"
-
-    static_ip = gcp.compute.Address(
-        "mumble-ip",
-        region=region,
-        address_type="EXTERNAL",
-        network_tier="PREMIUM",
-    )
-
-    gcp.compute.Firewall(
-        "mumble-firewall",
-        network="default",
-        allows=[
-            gcp.compute.FirewallAllowArgs(protocol="tcp", ports=[str(mumble_port)]),
-            gcp.compute.FirewallAllowArgs(protocol="udp", ports=[str(mumble_port)]),
-        ],
-        source_ranges=["0.0.0.0/0"],
-        target_tags=["mumble-server"],
-    )
-
-    gcp.compute.Firewall(
-        "ssh-firewall",
-        network="default",
-        allows=[
-            gcp.compute.FirewallAllowArgs(protocol="tcp", ports=["22"]),
-        ],
-        source_ranges=["0.0.0.0/0"],
-        target_tags=["mumble-server"],
-    )
-
-    gcp.compute.Instance(
-        "mumble-server",
-        machine_type=machine_type,
-        zone=zone,
-        boot_disk=gcp.compute.InstanceBootDiskArgs(
-            initialize_params=gcp.compute.InstanceBootDiskInitializeParamsArgs(
-                image="debian-cloud/debian-12",
-                size=10,
-                type="pd-standard",
-            ),
-        ),
-        network_interfaces=[
-            gcp.compute.InstanceNetworkInterfaceArgs(
-                network="default",
-                access_configs=[
-                    gcp.compute.InstanceNetworkInterfaceAccessConfigArgs(
-                        nat_ip=static_ip.address,
-                    ),
-                ],
-            ),
-        ],
-        metadata_startup_script=startup_script,
-        tags=["mumble-server"],
-    )
-
-    server_ip = static_ip.address
-
+    from providers.gcp import deploy
 else:
     raise ValueError(f"Unknown provider: {provider}. Use 'gcp' or 'upcloud'.")
+
+server_ip = deploy(config, startup_script, mumble_port)
 
 # --- Outputs ---
 pulumi.export("serverIp", server_ip)
