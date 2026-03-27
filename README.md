@@ -62,7 +62,7 @@ pulumi up
 | `mumina:superUserPassword` | yes | — | Admin password for SuperUser |
 | `mumina:serverName` | yes | — | Display name in Mumble |
 | `mumina:zone` | no | `europe-north1-a` | GCP zone ([full list](https://cloud.google.com/compute/docs/regions-zones)) |
-| `mumina:machineType` | no | `e2-small` | VM size ([options](https://cloud.google.com/compute/docs/general-purpose-machines)) |
+| `mumina:machineType` | no | `e2-micro` | VM size ([options](https://cloud.google.com/compute/docs/general-purpose-machines)) |
 | `mumina:maxUsers` | no | `10` | Max concurrent users |
 | `mumina:port` | no | `64738` | Mumble server port |
 | `mumina:welcomeText` | no | auto | HTML welcome message |
@@ -120,4 +120,4 @@ Close Mumble completely (check system tray), reopen and reconnect.
 |----------|---------|------|
 | Static IP | Permanent address | Free (while attached) |
 | Firewall rules | Open port 64738 + SSH | Free |
-| VM (e2-small) | Debian 12 + Mumble server | ~$13-16/month |
+| VM (e2-micro) | Debian 12 + Mumble server | ~$7-8/month |
