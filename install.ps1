@@ -66,7 +66,7 @@ if ($LASTEXITCODE -eq 0) {
     Write-Host "  Project '$projectId' already exists" -ForegroundColor Green
 } else {
     Write-Host "  Creating project '$projectId'..." -ForegroundColor White
-    gcloud projects create $projectId --name="Mumble Server"
+    gcloud projects create $projectId --name="Mumble Server" --labels=environment=development
 }
 
 # Link billing
